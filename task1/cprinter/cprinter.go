@@ -20,11 +20,6 @@ func Print(filePath string) error {
 		return fmt.Errorf("error starting command: %v", err)
 	}
 
-	// _, err = io.Copy(cmd.Stdout, file)
-	// if err != nil {
-	// 	return fmt.Errorf("error writing to pipe: %v", err)
-	// }
-
 	err = cmd.Wait()
 	if err != nil {
 		return fmt.Errorf("error waiting for command: %v", err)

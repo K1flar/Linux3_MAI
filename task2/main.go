@@ -93,14 +93,21 @@ func getBytesFromServer(port string, file string, reader io.Reader) ([]byte, err
 		return nil, err
 	}
 
-	// TODO: io.ReadAll не работает - т.к. процесс с прослушивающим портом не заканчивается
-	// и writer не закрывается
-	data := make([]byte, 1024)
-	n, err := reader.Read(data)
-	if err != nil {
-		return nil, err
+	data := make([]byte, 0, 1024)
+	buf := make([]byte, 1024)
+	for {
+		n, err := reader.Read(buf)
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, buf[:n]...)
+		if n != 1024 {
+			break
+		}
+
 	}
-	return data[:n], nil
+
+	return data, nil
 }
 
 func xorBytes(text, key []byte) []byte {
