@@ -1,52 +1,53 @@
 package main
 
 import (
+	"encoding/xml"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
-	"os/exec"
+	"task1/cprinter"
 )
 
+type Request struct {
+	XMLName  xml.Name `xml:"file"`
+	FilePath string   `xml:",chardata"`
+}
+
 func main() {
-	// Проверяем, был ли предоставлен путь к файлу в качестве аргумента командной строки
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run main.go <filename>")
+	if len(os.Args) == 1 {
+		fmt.Println("no port")
 		os.Exit(1)
 	}
+	port := os.Args[1]
 
-	// Получаем путь к файлу из аргументов командной строки
-	filePath := os.Args[1]
+	// init xml-rpc server
+	http.HandleFunc("/rpc/print", print)
 
-	// Открываем файл для чтения
-	file, err := os.Open(filePath)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
+	if err := http.ListenAndServe(fmt.Sprintf("localhost:%s", port), nil); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
-	defer file.Close()
+}
 
-	// Создаем новый процесс для вывода данных
-	cmd := exec.Command("cat") // Пример использования команды cat для вывода содержимого файла
-	cmd.Stdout = os.Stdout     // Направляем стандартный вывод процесса в стандартный вывод текущей программы
-
-	// Запускаем процесс
-	err = cmd.Start()
+func print(w http.ResponseWriter, r *http.Request) {
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
-		fmt.Println("Error starting command:", err)
-		os.Exit(1)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	req := Request{}
+	err = xml.Unmarshal(b, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	// Копируем содержимое файла в канал Pipe (в стандартный ввод процесса)
-	_, err = io.Copy(cmd.Stdout, file)
+	err = cprinter.Print(req.FilePath)
 	if err != nil {
-		fmt.Println("Error writing to pipe:", err)
-		os.Exit(1)
-	}
-
-	// Ждем завершения процесса
-	err = cmd.Wait()
-	if err != nil {
-		fmt.Println("Error waiting for command:", err)
-		os.Exit(1)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 }
